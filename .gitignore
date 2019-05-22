@@ -6,3 +6,8 @@ tmp
 
 # Environment variables, never commit this file
 .env
+
+# Webstorm workspace files
+.idea/
+
+yarn.lock

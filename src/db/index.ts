@@ -11,7 +11,7 @@ db.addModels(models);
 export const syncDB = ()=>{
     return db.sync(syncOptions)
         .then(() => {
-            let message = "Database connection successful";
+            let message = "✓ Database connection successful";
             console.log(chalk.green(message));
         })
         .catch(e => {
