@@ -4,6 +4,7 @@ import crypto from "crypto";
 import moment from "moment";
 import jwt from 'jsonwebtoken';
 import {User} from "../models";
+import sendEmail, {mail} from "../utils/mailer";
 
 class AuthController {
     static async signup(req: Request, res: Response) {
@@ -109,6 +110,32 @@ class AuthController {
 
         // send email with token
         const callBackUrl = `http://${process.env.HOST}:${process.env.PORT}/api/auth/reset-password?reset_token=${token}`;
+        const html = `
+        <div>
+        <h4>You have received this email because you requested password change.</h4>
+        <p>Click this <a href="${callBackUrl}">link </a> to reset your password</p>
+        <br>
+        <br>
+        <p>Thanks.</p>
+        </div>
+        `;
+        const mailOptions = {
+            from: "nyugoh@gmail.com",
+            to: user.email,
+            subject: 'Password reset',
+            html
+        };
+
+
+        mail(mailOptions);
+        /*, function (info) {
+            console.log(info);
+            if(info.error){
+                res.json({
+                    success: false
+                })
+            }
+        });*/
         return res.json({
             success: true,
             message: "Email sent, token expires in 12 hours",
@@ -142,10 +169,10 @@ class AuthController {
                 });
             } else {
                 const {password} = req.body;
-                if(!password)
+                if (!password)
                     return res.json({
-                       success: false,
-                       message: "Password is required"
+                        success: false,
+                        message: "Password is required"
                     });
                 user.password = password;
                 await User.hashPassword(user);

@@ -1,8 +1,8 @@
-// import chalk from "chalk";
+import chalk from "chalk";
 
 const exceptionHandler = (err, req, res, next) => {
     // Handle the exception handling
-    // console.log(chalk.red("WE GOT A NEW ERROR"));
+    console.log(chalk.red("WE GOT A NEW ERROR"));
     console.error(err);
     res.status(500).json({
         success: false,
