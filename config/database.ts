@@ -1,5 +1,5 @@
 import { SyncOptions } from "sequelize";
-import { User } from "app/models";
+import { User } from "../src/models";
 
 export const models = [User];
 
