@@ -92,6 +92,20 @@ class User extends Model<User> {
     })
     isActive: string;
 
+    @Column({
+        type: DataType.STRING(256),
+        allowNull: true,
+        field: 'reset_password_token'
+    })
+    passwordToken: string;
+
+    @Column({
+        type: DataType.DATE,
+        allowNull: true,
+        field: 'password_token_expiry'
+    })
+    tokenExpiry: string;
+
     @CreatedAt
     created_at: Date;
 

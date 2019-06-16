@@ -1,37 +1,39 @@
 import {Request, Response} from "express";
 import bcrypt from "bcrypt";
+import crypto from "crypto";
+import moment from "moment";
 import jwt from 'jsonwebtoken';
 import {User} from "../models";
 
 class AuthController {
     static async signup(req: Request, res: Response) {
-        const { userName, email, fullName, firstName, lastName } = req.body;
-        const userNameTaken = await User.findAndCountAll({where: { userName}});
-        const emailExists = await User.findAndCountAll({where: { email}});
+        const {userName, email, fullName, firstName, lastName} = req.body;
+        const userNameTaken = await User.findAndCountAll({where: {userName}});
+        const emailExists = await User.findAndCountAll({where: {email}});
         const regexp = new RegExp(/^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/);
         const isValidEmail = regexp.test(email);
 
-        if(userNameTaken.count > 0) {
+        if (userNameTaken.count > 0) {
             return res.json({
                 success: false,
                 message: "Username taken"
             });
         }
 
-        if(emailExists.count > 0) {
+        if (emailExists.count > 0) {
             return res.json({
                 success: false,
                 message: "Email already exists"
             });
         }
 
-        if(!isValidEmail) {
+        if (!isValidEmail) {
             return res.json({
                 success: false,
                 message: "Provide a valid email"
             });
         }
-        if(!fullName){
+        if (!fullName) {
             req.body.fullName = `${firstName} ${lastName}`;
         }
         const user = await User.create(req.body);
@@ -59,7 +61,7 @@ class AuthController {
         }
 
         let userPassword = user.password.replace("$2y$", "$2a$");
-        if (! await bcrypt.compare(password, userPassword)) {
+        if (!await bcrypt.compare(password, userPassword)) {
             return res.status(402).json({
                 success: false,
                 message: "Incorrect credentials"
@@ -82,17 +84,87 @@ class AuthController {
 
     static async recoverPassword(req: Request, res: Response) {
         const {email} = req.body;
-        const user = await User.find({
+        let user = await User.findOne({
             where: {
                 email
             }
         });
 
-        return res.status(402).json({
-            success: false,
-            field: "password",
-            message: "Incorrect credentials"
+        if (!user) {
+            return res.status(402).json({
+                success: false,
+                message: "User doesnt exist"
+            });
+        }
+        // Generate a token and expiry date
+        const buffer = await crypto.randomBytes(50);
+        const token = buffer.toString('hex');
+        const expiryDate = moment().add(12, 'hours').format();
+
+        // Insert into DB
+        await User.update({
+            passwordToken: token,
+            tokenExpiry: expiryDate
+        }, {where: {email}});
+
+        // send email with token
+        const callBackUrl = `http://${process.env.HOST}:${process.env.PORT}/api/auth/reset-password?reset_token=${token}`;
+        return res.json({
+            success: true,
+            message: "Email sent, token expires in 12 hours",
+            url: callBackUrl
         });
+    }
+
+    static async resetPassword(req: Request, res: Response) {
+        const token = req.query.reset_token;
+        const user = await User.findOne({where: {passwordToken: token}});
+        if (!user) {
+            return res.json({
+                success: false,
+                message: "Invalid link"
+            });
+        }
+        if (moment().isBefore(moment(user.tokenExpiry))) {
+            if (req.method == 'GET') {
+                /*
+                 const buffer = await crypto.randomBytes(50); // check if token match when updating password
+                const token = buffer.toString('hex');
+                // Insert into DB
+                await User.update({
+                    passwordToken: token,
+                }, { where: { email: user.email }});
+               */
+                // Redirect to reset password form
+                return res.json({
+                    success: true,
+                    message: 'Redirect user to reset form'
+                });
+            } else {
+                const {password} = req.body;
+                if(!password)
+                    return res.json({
+                       success: false,
+                       message: "Password is required"
+                    });
+                user.password = password;
+                await User.hashPassword(user);
+                await User.update({
+                    password: user.password,
+                    passwordToken: null,
+                    tokenExpiry: null
+                }, {where: {id: user.id, passwordToken: token}});
+                return res.json({
+                    success: true,
+                    message: "Reset successful, redirect to login"
+                });
+            }
+        } else {
+            res.json({
+                success: false,
+                message: "Token is expired"
+            });
+        }
     }
 }
 
